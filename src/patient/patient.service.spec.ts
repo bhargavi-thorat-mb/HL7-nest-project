@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { Hl7Service } from './hl7.service';
+import { Hl7ParserService } from '../hl7-shared/hl7-parser.service';
+import { PatientService } from './patient.service';
 
 const SEGMENTS = [
   'MSH|^~\\&|ADT_SYS|CITY_HOSP|LAB_SYS|CITY_HOSP|202609240900||ADT^A01|MSG1001|P|2.5',
@@ -18,15 +19,15 @@ const EXPECTED_PID = {
   sex: 'F',
 };
 
-describe('Hl7Service', () => {
-  let service: Hl7Service;
+describe('PatientService', () => {
+  let service: PatientService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [Hl7Service],
+      providers: [PatientService, Hl7ParserService],
     }).compile();
 
-    service = module.get<Hl7Service>(Hl7Service);
+    service = module.get<PatientService>(PatientService);
   });
 
   describe('extractPid', () => {

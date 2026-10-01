@@ -13,14 +13,6 @@ export interface PidFields {
   sex: string; // PID.8    - administrative sex (HL7 table 0001)
 }
 
-/**
- * HL7 separates segments with \r, but pasted/JSON-posted messages often use \n or \r\n.
- * Convert everything to \r and drop trailing \r/whitespace so no empty segment is left at the end.
- */
-export function normalizeLineEndings(raw: string): string {
-  return raw.replace(/\r\n|\n/g, '\r').replace(/[\r\s]+$/, '');
-}
-
 /** HL7 table 0001 (M/F/O/...) -> FHIR administrative gender. */
 export function mapGender(sex: string): Patient['gender'] {
   switch (sex.trim().toUpperCase()) {

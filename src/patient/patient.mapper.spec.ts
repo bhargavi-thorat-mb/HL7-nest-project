@@ -2,9 +2,8 @@ import {
   hl7DateToFhir,
   mapGender,
   mapToFhirPatient,
-  normalizeLineEndings,
   type PidFields,
-} from './hl7.mapper';
+} from './patient.mapper';
 
 describe('mapGender', () => {
   it.each([
@@ -37,12 +36,6 @@ describe('hl7DateToFhir', () => {
       expect(hl7DateToFhir(input)).toBeUndefined();
     },
   );
-});
-
-describe('normalizeLineEndings', () => {
-  it('converts \\n and \\r\\n to \\r and trims the trailing newline', () => {
-    expect(normalizeLineEndings('A\nB\r\nC\n')).toBe('A\rB\rC');
-  });
 });
 
 describe('mapToFhirPatient', () => {

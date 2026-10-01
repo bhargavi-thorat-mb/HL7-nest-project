@@ -2,7 +2,8 @@ import { Module } from '@nestjs/common';
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { Hl7Module } from './hl7/hl7.module';
+import { ObservationModule } from './observation/observation.module';
+import { PatientModule } from './patient/patient.module';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -15,7 +16,8 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       appSecret: 'YOUR_APP_SECRET',
       serviceId: 'hl7-nest',
     }),
-    Hl7Module,
+    PatientModule,
+    ObservationModule,
   ],
   controllers: [AppController],
   providers: [AppService],
