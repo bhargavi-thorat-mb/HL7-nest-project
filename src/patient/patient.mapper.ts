@@ -36,6 +36,38 @@ export function hl7DateToFhir(ts: string): string | undefined {
   return match ? `${match[1]}-${match[2]}-${match[3]}` : undefined;
 }
 
+// HL7 TS/DTM: YYYYMMDD[HHMM[SS[.S-SSSS]]][+/-ZZZZ]
+const HL7_DATE_TIME =
+  /^(\d{4})(\d{2})(\d{2})(?:(\d{2})(\d{2})(?:(\d{2})(\.\d{1,4})?)?)?([+-]\d{4})?$/;
+
+/**
+ * HL7 timestamp -> FHIR dateTime, keeping the time only when HL7 gives a timezone offset.
+ *   20260924090000+0530 -> 2026-09-24T09:00:00+05:30
+ *   202609240900        -> 2026-09-24  (no offset: never invent a timezone)
+ *   20260924            -> 2026-09-24
+ * FHIR requires seconds once a time is present, so a missing SS becomes 00.
+ * Anything else (e.g. hour without minutes) falls back to hl7DateToFhir: date only or undefined.
+ */
+export function hl7DateTimeToFhir(ts: string): string | undefined {
+  const match = HL7_DATE_TIME.exec(ts.trim());
+  if (!match) return hl7DateToFhir(ts);
+
+  const [
+    ,
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second = '00',
+    fraction = '',
+    offset,
+  ] = match;
+  const date = `${year}-${month}-${day}`;
+  if (!hour || !offset) return date;
+  return `${date}T${hour}:${minute}:${second}${fraction}${offset.slice(0, 3)}:${offset.slice(3)}`;
+}
+
 export function mapToFhirPatient(pid: PidFields): Patient {
   const patient: Patient = { resourceType: 'Patient' };
 

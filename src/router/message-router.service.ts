@@ -1,8 +1,6 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotImplementedException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import type { EncounterResult } from '../encounter/encounter.mapper';
+import { EncounterService } from '../encounter/encounter.service';
 import { Hl7ParserService } from '../hl7-shared/hl7-parser.service';
 import type { OruResult } from '../observation/observation.mapper';
 import { ObservationService } from '../observation/observation.service';
@@ -21,10 +19,11 @@ export class MessageRouterService {
   constructor(
     private readonly parser: Hl7ParserService,
     private readonly observationService: ObservationService,
+    private readonly encounterService: EncounterService,
   ) {}
 
   /** Pick the conversion flow from MSH.9 (message code ^ trigger event). */
-  convert(raw: string): OruResult {
+  convert(raw: string): OruResult | EncounterResult {
     const received = this.parser.getMessageType(raw);
     // Senders vary in case and padding, so normalize before matching.
     const type = `${received.messageCode.trim().toUpperCase()}^${received.triggerEvent.trim().toUpperCase()}`;
@@ -36,7 +35,7 @@ export class MessageRouterService {
       case 'ADT^A02':
       case 'ADT^A03':
       case 'ADT^A04':
-        throw new NotImplementedException('ADT handling not implemented yet');
+        return this.encounterService.convertHl7ToFhirEncounter(raw);
       default:
         // Show the value as received, so the sender can see exactly what they sent.
         throw new BadRequestException(

@@ -117,4 +117,53 @@ describe('Hl7ParserService', () => {
       );
     });
   });
+
+  describe('readFields', () => {
+    const message = () =>
+      parser.parse(
+        `${MSH}\n${PID}\nPV1|1|I|WARD^101||||1234^Doe^Jane~5678^Roe^Rick`,
+      );
+
+    it('reads each path into a value keyed like the map', () => {
+      expect(
+        parser.readFields(message(), {
+          cls: { path: 'PV1.2', required: true },
+          ward: { path: 'PV1.3.1' },
+          room: { path: 'PV1.3.2' },
+          family: { path: 'PV1.7.2' },
+        }),
+      ).toEqual({ cls: 'I', ward: 'WARD', room: '101', family: 'Doe' });
+    });
+
+    it('reads the first repetition of a repeating field', () => {
+      expect(
+        parser.readFields(message(), {
+          given: { path: 'PV1.7.3' },
+          family: { path: 'PV1.7.2' },
+        }),
+      ).toEqual({ given: 'Jane', family: 'Doe' });
+    });
+
+    it('returns "" for missing optional fields and segments', () => {
+      expect(
+        parser.readFields(message(), {
+          bed: { path: 'PV1.3.3' },
+          admit: { path: 'PV1.44' },
+          evn: { path: 'EVN.2' },
+        }),
+      ).toEqual({ bed: '', admit: '', evn: '' });
+    });
+
+    it.each(['PV1|1||WARD', 'PV1|1| |WARD'])(
+      'throws 400 naming the path when a required field is empty (%p)',
+      (pv1) => {
+        const msg = parser.parse(`${MSH}\n${PID}\n${pv1}`);
+        const map = { cls: { path: 'PV1.2', required: true } };
+        expect(() => parser.readFields(msg, map)).toThrow(BadRequestException);
+        expect(() => parser.readFields(msg, map)).toThrow(
+          'HL7 message is missing required field PV1.2',
+        );
+      },
+    );
+  });
 });

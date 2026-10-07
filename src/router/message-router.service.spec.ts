@@ -1,6 +1,9 @@
-import { BadRequestException, NotImplementedException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { EncounterService } from '../encounter/encounter.service';
+import { EventService } from '../event/event.service';
 import { Hl7ParserService } from '../hl7-shared/hl7-parser.service';
+import type { OruResult } from '../observation/observation.mapper';
 import { ObservationService } from '../observation/observation.service';
 import { PatientService } from '../patient/patient.service';
 import {
@@ -15,23 +18,28 @@ const OBR = 'OBR|1||OBR12345|11348-0^History of past illness^LN|||20250812';
 const OBX =
   'OBX|1|CWE|11348-0^History of past illness^LN||38341003^Hypertension^SCT|||A||||||20240812';
 const oru = (type = 'ORU^R01') => [msh(type), PID, OBR, OBX].join('\n');
-const adt = (type: string) => [msh(type), 'EVN||202609240900', PID].join('\n');
+const adt = (type: string) =>
+  [msh(type), 'EVN||202609240900', PID, 'PV1|1|I|WARD^101^1^CH'].join('\n');
 
 describe('MessageRouterService.convert', () => {
   let router: MessageRouterService;
   let observationService: ObservationService;
+  let encounterService: EncounterService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MessageRouterService,
         ObservationService,
+        EncounterService,
+        EventService,
         PatientService,
         Hl7ParserService,
       ],
     }).compile();
     router = module.get(MessageRouterService);
     observationService = module.get(ObservationService);
+    encounterService = module.get(EncounterService);
   });
 
   it('sends ORU^R01 through the Observation flow (same result as /to-fhir-observation)', () => {
@@ -39,34 +47,43 @@ describe('MessageRouterService.convert', () => {
     const result = router.convert(oru());
     expect(spy).toHaveBeenCalledWith(oru());
     expect(result).toEqual(observationService.extractOru(oru()));
-    expect(result.observations).toHaveLength(1);
+    expect((result as OruResult).observations).toHaveLength(1);
   });
 
   it.each(['oru^r01', ' ORU ^ R01 ', 'ORU^R01^ORU_R01'])(
     'normalizes %p to ORU^R01',
     (type) => {
-      expect(router.convert(oru(type)).observations).toHaveLength(1);
+      expect(
+        (router.convert(oru(type)) as OruResult).observations,
+      ).toHaveLength(1);
     },
   );
 
-  it.each(['ADT^A01', 'ADT^A02', 'ADT^A03', 'ADT^A04', 'adt^a03'])(
-    'answers 501 for %p',
-    (type) => {
-      let error: unknown;
-      try {
-        router.convert(adt(type));
-      } catch (err) {
-        error = err;
-      }
-      expect(error).toBeInstanceOf(NotImplementedException);
-      expect((error as NotImplementedException).getStatus()).toBe(501);
-      expect((error as NotImplementedException).getResponse()).toEqual({
-        message: 'ADT handling not implemented yet',
-        error: 'Not Implemented',
-        statusCode: 501,
-      });
+  // Replaces the earlier 501 tests: ADT^A01-A04 now go to the Encounter flow.
+  it.each([
+    ['ADT^A01', 'in-progress'],
+    ['ADT^A02', 'in-progress'],
+    ['ADT^A03', 'finished'],
+    ['ADT^A04', 'arrived'],
+    ['adt^a03', 'finished'],
+  ])(
+    'sends %p through the Encounter flow (same result as /to-fhir-encounter)',
+    (type, status) => {
+      const spy = jest.spyOn(encounterService, 'convertHl7ToFhirEncounter');
+      const result = router.convert(adt(type));
+      expect(spy).toHaveBeenCalledWith(adt(type));
+      expect(result).toEqual(
+        encounterService.convertHl7ToFhirEncounter(adt(type)),
+      );
+      expect(result).toHaveProperty('encounter.status', status);
     },
   );
+
+  it('keeps Encounter errors for a recognized ADT with bad content', () => {
+    expect(() => router.convert([msh('ADT^A01'), PID].join('\n'))).toThrow(
+      'HL7 message has no PV1 segment',
+    );
+  });
 
   it.each([
     ['ADT^A08', 'ADT^A08'],

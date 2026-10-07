@@ -9,6 +9,12 @@ export function normalizeLineEndings(raw: string): string {
   return raw.replace(/\r\n|\n/g, '\r').replace(/[\r\s]+$/, '');
 }
 
+/** Where to read one value: an HL7 path such as 'PV1.3.1', and whether it must be non-empty. */
+export interface Hl7FieldSpec {
+  path: string;
+  required?: boolean;
+}
+
 /** MSH.9 components as received (not trimmed or uppercased). */
 export interface MessageType {
   messageCode: string; // MSH.9.1 - e.g. ADT, ORU (HL7 table 0076)
@@ -75,5 +81,29 @@ export class Hl7ParserService {
     }
 
     return { messageCode, triggerEvent };
+  }
+
+  /**
+   * Read every path in `fieldMap` into a plain object of strings, keyed like the map.
+   * Missing segments, fields or components read as "" (empty node). A required field that
+   * is empty (or only whitespace) -> 400 naming its path.
+   * Paths on a repeating field (e.g. PV1.7.2) read the first repetition only.
+   */
+  readFields<M extends Record<string, Hl7FieldSpec>>(
+    message: Message,
+    fieldMap: M,
+  ): Record<keyof M, string> {
+    const values = {} as Record<keyof M, string>;
+    for (const key of Object.keys(fieldMap) as (keyof M)[]) {
+      const { path, required } = fieldMap[key];
+      const value = message.get(path).toString();
+      if (required && !value.trim()) {
+        throw new BadRequestException(
+          `HL7 message is missing required field ${path}`,
+        );
+      }
+      values[key] = value;
+    }
+    return values;
   }
 }
