@@ -61,4 +61,60 @@ describe('Hl7ParserService', () => {
       );
     });
   });
+
+  describe('getMessageType', () => {
+    // MSH with MSH.9 replaced by `type`.
+    const mshWith = (type: string) =>
+      `MSH|^~\\&|ADT_SYS|CITY_HOSP|LAB_SYS|CITY_HOSP|202609240900||${type}|MSG1001|P|2.5`;
+
+    it.each([
+      ['ADT^A01^ADT_A01', 'ADT', 'A01'],
+      ['ADT^A03', 'ADT', 'A03'],
+      ['ORU^R01', 'ORU', 'R01'],
+    ])('reads %p as code + trigger', (type, messageCode, triggerEvent) => {
+      expect(parser.getMessageType(`${mshWith(type)}\n${PID}`)).toEqual({
+        messageCode,
+        triggerEvent,
+      });
+    });
+
+    it('returns values as received (no trimming or uppercasing)', () => {
+      expect(parser.getMessageType(mshWith(' adt^a01'))).toEqual({
+        messageCode: ' adt',
+        triggerEvent: 'a01',
+      });
+    });
+
+    it.each([
+      ['empty MSH.9', mshWith(''), /MSH\.9\.1 \(message code\) and MSH\.9\.2/],
+      [
+        'no trigger event',
+        mshWith('ADT'),
+        /MSH\.9\.2 \(trigger event\) is empty/,
+      ],
+      [
+        'no message code',
+        mshWith('^A01'),
+        /MSH\.9\.1 \(message code\) is empty/,
+      ],
+      ['whitespace only', mshWith(' ^ '), /MSH\.9\.1 .* and MSH\.9\.2/],
+      [
+        'MSH cut off before MSH.9',
+        'MSH|^~\\&|ADT_SYS|CITY_HOSP|LAB_SYS|CITY_HOSP|202609240900|',
+        /missing or incomplete/,
+      ],
+    ])('throws 400 for %s', (_label, raw, message) => {
+      expect(() => parser.getMessageType(raw)).toThrow(BadRequestException);
+      expect(() => parser.getMessageType(raw)).toThrow(message);
+    });
+
+    it('keeps the empty / unparseable 400s from parse()', () => {
+      expect(() => parser.getMessageType(' \n')).toThrow(
+        'HL7 message is empty',
+      );
+      expect(() => parser.getMessageType('hello')).toThrow(
+        /Could not parse HL7 message/,
+      );
+    });
+  });
 });

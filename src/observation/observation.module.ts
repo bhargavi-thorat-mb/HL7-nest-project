@@ -10,5 +10,7 @@ import { ObservationService } from './observation.service';
   imports: [Hl7SharedModule, PatientModule],
   controllers: [ObservationController],
   providers: [ObservationService],
+  // Exported so MessageRouterModule can dispatch ORU^R01 to it.
+  exports: [ObservationService],
 })
 export class ObservationModule {}

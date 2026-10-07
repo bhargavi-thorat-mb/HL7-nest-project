@@ -9,6 +9,12 @@ export function normalizeLineEndings(raw: string): string {
   return raw.replace(/\r\n|\n/g, '\r').replace(/[\r\s]+$/, '');
 }
 
+/** MSH.9 components as received (not trimmed or uppercased). */
+export interface MessageType {
+  messageCode: string; // MSH.9.1 - e.g. ADT, ORU (HL7 table 0076)
+  triggerEvent: string; // MSH.9.2 - e.g. A01, R01 (HL7 table 0003)
+}
+
 /**
  * Generic HL7 v2 text handling shared by every resource module.
  *
@@ -43,5 +49,31 @@ export class Hl7ParserService {
     if (!message.exists(name)) {
       throw new BadRequestException(`HL7 message has no ${name} segment`);
     }
+  }
+
+  /**
+   * Read the message type from MSH.9 (code^trigger^structure, e.g. ADT^A01^ADT_A01).
+   * Values are returned as received; callers normalize them. Empty code or trigger -> 400.
+   */
+  getMessageType(raw: string): MessageType {
+    const message = this.parse(raw);
+
+    // Read the components separately: get('MSH.9').toString() returns only the first one.
+    // A missing or short MSH.9 reads as "" (empty node), never a throw, so check both values;
+    // exists('MSH.9') alone would accept "^A01".
+    const messageCode = message.get('MSH.9.1').toString();
+    const triggerEvent = message.get('MSH.9.2').toString();
+
+    const missing = [
+      !messageCode.trim() && 'MSH.9.1 (message code)',
+      !triggerEvent.trim() && 'MSH.9.2 (trigger event)',
+    ].filter(Boolean);
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `HL7 message type is missing or incomplete: ${missing.join(' and ')} is empty`,
+      );
+    }
+
+    return { messageCode, triggerEvent };
   }
 }
