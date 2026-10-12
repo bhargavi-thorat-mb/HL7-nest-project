@@ -1,5 +1,6 @@
 import {
   hl7DateTimeToFhir,
+  hl7DateTimeToFhirInstant,
   hl7DateToFhir,
   mapGender,
   mapToFhirPatient,
@@ -112,5 +113,32 @@ describe('hl7DateTimeToFhir', () => {
 
   it('leaves hl7DateToFhir date-only even with an offset', () => {
     expect(hl7DateToFhir('202609240900+0530')).toBe('2026-09-24');
+  });
+});
+
+describe('hl7DateTimeToFhirInstant', () => {
+  it.each([
+    ['202610080900+0530', '2026-10-08T09:00:00+05:30'],
+    ['20261008090015-0400', '2026-10-08T09:00:15-04:00'],
+  ])(
+    'returns an instant when there is a time and an offset: %p',
+    (input, expected) => {
+      expect(hl7DateTimeToFhirInstant(input)).toBe(expected);
+    },
+  );
+
+  it.each([
+    '202610080900', // time, no offset
+    '20261008', // date only
+    '20261008+0530', // offset but no time
+    '2026100809+0530', // hour without minutes
+    '',
+    'garbage',
+  ])('returns undefined for %p', (input) => {
+    expect(hl7DateTimeToFhirInstant(input)).toBeUndefined();
+  });
+
+  it('leaves hl7DateTimeToFhir unchanged (date only without an offset)', () => {
+    expect(hl7DateTimeToFhir('202610080900')).toBe('2026-10-08');
   });
 });

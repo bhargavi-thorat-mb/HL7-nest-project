@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { DocumentReferenceModule } from './document-reference/document-reference.module';
 import { EncounterModule } from './encounter/encounter.module';
 import { ObservationModule } from './observation/observation.module';
 import { PatientModule } from './patient/patient.module';
@@ -21,6 +22,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     PatientModule,
     ObservationModule,
     EncounterModule,
+    DocumentReferenceModule,
     MessageRouterModule,
   ],
   controllers: [AppController],

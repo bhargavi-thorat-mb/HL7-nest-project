@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { DocumentReferenceService } from '../document-reference/document-reference.service';
 import { EncounterService } from '../encounter/encounter.service';
 import { EventService } from '../event/event.service';
 import { Hl7ParserService } from '../hl7-shared/hl7-parser.service';
@@ -18,6 +19,7 @@ describe('MessageRouterController', () => {
         MessageRouterService,
         ObservationService,
         EncounterService,
+        DocumentReferenceService,
         EventService,
         PatientService,
         Hl7ParserService,

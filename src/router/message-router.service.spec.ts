@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { DocumentReferenceService } from '../document-reference/document-reference.service';
 import { EncounterService } from '../encounter/encounter.service';
 import { EventService } from '../event/event.service';
 import { Hl7ParserService } from '../hl7-shared/hl7-parser.service';
@@ -20,11 +21,17 @@ const OBX =
 const oru = (type = 'ORU^R01') => [msh(type), PID, OBR, OBX].join('\n');
 const adt = (type: string) =>
   [msh(type), 'EVN||202609240900', PID, 'PV1|1|I|WARD^101^1^CH'].join('\n');
+const TXA =
+  'TXA|1|DS|TX|202610080900||202610080900|||1234^Doe^Jane|||DOC5001|||||AU||AV';
+const DOC_OBX =
+  'OBX|1|TX|18842-5^Discharge summary^LN||Patient stable, discharge planned tomorrow.||||||F';
+const mdm = (type: string) => [msh(type), PID, TXA, DOC_OBX].join('\n');
 
 describe('MessageRouterService.convert', () => {
   let router: MessageRouterService;
   let observationService: ObservationService;
   let encounterService: EncounterService;
+  let documentReferenceService: DocumentReferenceService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -32,6 +39,7 @@ describe('MessageRouterService.convert', () => {
         MessageRouterService,
         ObservationService,
         EncounterService,
+        DocumentReferenceService,
         EventService,
         PatientService,
         Hl7ParserService,
@@ -40,6 +48,40 @@ describe('MessageRouterService.convert', () => {
     router = module.get(MessageRouterService);
     observationService = module.get(ObservationService);
     encounterService = module.get(EncounterService);
+    documentReferenceService = module.get(DocumentReferenceService);
+  });
+
+  it.each([
+    ['MDM^T01', 'current'],
+    ['MDM^T02', 'current'],
+    ['MDM^T11', 'entered-in-error'],
+    ['mdm^t02^MDM_T02', 'current'],
+  ])(
+    'sends %p through the DocumentReference flow (same result as /to-fhir-document-reference)',
+    (type, status) => {
+      const spy = jest.spyOn(
+        documentReferenceService,
+        'convertHl7ToFhirDocumentReference',
+      );
+      const result = router.convert(mdm(type));
+      expect(spy).toHaveBeenCalledWith(mdm(type));
+      expect(result).toEqual(
+        documentReferenceService.convertHl7ToFhirDocumentReference(mdm(type)),
+      );
+      expect(result).toHaveProperty('documentReference.status', status);
+    },
+  );
+
+  it('answers 400 for an unsupported MDM trigger, listing the MDM types', () => {
+    expect(() => router.convert(mdm('MDM^T03'))).toThrow(
+      'Unsupported HL7 message type "MDM^T03". Supported types: ORU^R01, ADT^A01, ADT^A02, ADT^A03, ADT^A04, MDM^T01, MDM^T02, MDM^T11',
+    );
+  });
+
+  it('keeps DocumentReference errors for a recognized MDM with bad content', () => {
+    expect(() => router.convert([msh('MDM^T02'), PID].join('\n'))).toThrow(
+      'HL7 message has no TXA segment',
+    );
   });
 
   it('sends ORU^R01 through the Observation flow (same result as /to-fhir-observation)', () => {

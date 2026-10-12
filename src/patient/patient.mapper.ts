@@ -68,6 +68,17 @@ export function hl7DateTimeToFhir(ts: string): string | undefined {
   return `${date}T${hour}:${minute}:${second}${fraction}${offset.slice(0, 3)}:${offset.slice(3)}`;
 }
 
+/**
+ * HL7 timestamp -> FHIR instant, which needs a date, a time AND a timezone.
+ *   202610080900+0530 -> 2026-10-08T09:00:00+05:30
+ *   202610080900      -> undefined (no offset), 20261008 -> undefined (no time)
+ */
+export function hl7DateTimeToFhirInstant(ts: string): string | undefined {
+  // hl7DateTimeToFhir only returns a time part (…T…) when both time and offset are present.
+  const value = hl7DateTimeToFhir(ts);
+  return value?.includes('T') ? value : undefined;
+}
+
 export function mapToFhirPatient(pid: PidFields): Patient {
   const patient: Patient = { resourceType: 'Patient' };
 

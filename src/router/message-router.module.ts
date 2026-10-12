@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DocumentReferenceModule } from '../document-reference/document-reference.module';
 import { EncounterModule } from '../encounter/encounter.module';
 import { Hl7SharedModule } from '../hl7-shared/hl7-shared.module';
 import { ObservationModule } from '../observation/observation.module';
@@ -7,7 +8,12 @@ import { MessageRouterService } from './message-router.service';
 
 // Named MessageRouter* to avoid confusion with Nest's own RouterModule (@nestjs/core).
 @Module({
-  imports: [Hl7SharedModule, ObservationModule, EncounterModule],
+  imports: [
+    Hl7SharedModule,
+    ObservationModule,
+    EncounterModule,
+    DocumentReferenceModule,
+  ],
   controllers: [MessageRouterController],
   providers: [MessageRouterService],
 })
